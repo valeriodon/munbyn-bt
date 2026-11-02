@@ -383,7 +383,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func subtitle(_ item: NSMenuItem, _ text: String) {
-        if #available(macOS 14.4, *) { item.subtitle = text } else { item.toolTip = text }
+        #if compiler(>=5.10)  // the macOS 14.4 SDK, which has NSMenuItem.subtitle
+        if #available(macOS 14.4, *) { item.subtitle = text; return }
+        #endif
+        item.toolTip = text
     }
 
     private func action(_ title: String, _ selector: Selector, enabled: Bool = true, key: String = "") -> NSMenuItem {
