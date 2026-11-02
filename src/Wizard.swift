@@ -269,6 +269,13 @@ final class WizardWindow: NSObject, NSWindowDelegate {
 
 // MARK: - Views
 
+/// The warm paper tone of the app icon, with a dark counterpart.
+let stripBackground = NSColor(name: nil) { appearance in
+    appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        ? NSColor(srgbRed: 0.17, green: 0.16, blue: 0.15, alpha: 1)
+        : NSColor(srgbRed: 0.965, green: 0.945, blue: 0.91, alpha: 1)
+}
+
 struct WizardView: View {
     @ObservedObject var model: WizardModel
     @AccessibilityFocusState private var headingFocused: Bool
@@ -280,7 +287,7 @@ struct WizardView: View {
                 .padding(.top, 22)
                 .padding(.bottom, 18)
                 .frame(maxWidth: .infinity)
-                .background(Color(nsColor: .underPageBackgroundColor).opacity(0.5))
+                .background(Color(nsColor: stripBackground))
             Divider()
             VStack(alignment: .leading, spacing: 12) {
                 if let n = model.step.number {
@@ -619,9 +626,10 @@ struct ConnectStep: View {
                 }
             case .connected(let name):
                 Paragraph("\(name) is ready. MunbynBT will connect to it whenever you print.")
-            case .failed(_, let message, let recovery):
-                Paragraph(message)
-                if recovery == .tryAgain || recovery == .openBluetoothSettings {
+            case .failed(let title, let message, let recovery):
+                // "Printer not found" is all checklist; other errors say what happened first.
+                Paragraph(title == UserError.printerNotFound.title ? "Check these, then try again:" : message)
+                if title == UserError.printerNotFound.title {
                     VStack(alignment: .leading, spacing: 6) {
                         Hint(symbol: "power", text: "Is it on? The light should be lit.")
                         Hint(symbol: "dot.radiowaves.left.and.right", text: "Is it within a few meters of your Mac?")
@@ -727,7 +735,13 @@ struct TestStep: View {
                     .accessibilityValue("\(Int(fraction * 100)) percent")
                 Paragraph("Keep the printer on until the label is out.")
             case .ask:
-                Paragraph("Check the arrow points up and the small text is readable.")
+                HStack(alignment: .top, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Paragraph("Compare it with this preview. The arrow should point up, the bars should be crisp and the smallest text readable.")
+                        Hint(symbol: "circle.lefthalf.filled", text: "Pale or patchy? Choose Too Light. Smudged or bleeding? Choose Too Dark.")
+                    }
+                    TestPreview()
+                }
             case .adjusted(let darkness):
                 Paragraph("Darkness set to \(darkness). Print again to check.")
             case .nothing:
@@ -739,6 +753,34 @@ struct TestStep: View {
             case .failed(_, let message):
                 Paragraph(message)
             }
+        }
+    }
+}
+
+/// What the test label should look like, rendered by the same code that prints it.
+struct TestPreview: View {
+    private static let image: NSImage? = {
+        let o = Options.fromSettings()
+        guard let bm = try? renderDocument(makeTestPDF(label: o.fallbackLabel, onA4: false, settings: testLabelFooter(o)), opts: o).first,
+              let provider = CGDataProvider(data: Data(bm.pixels) as CFData),
+              let cg = CGImage(width: bm.width, height: bm.height, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: bm.width,
+                               space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: 0),
+                               provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+        else { return nil }
+        return NSImage(cgImage: cg, size: NSSize(width: bm.width, height: bm.height))
+    }()
+
+    var body: some View {
+        if let image = Self.image {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(height: 170)
+                .background(Color.white)
+                .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.secondary.opacity(0.4)))
+                .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
+                .accessibilityLabel("Preview of the test label")
         }
     }
 }

@@ -22,9 +22,9 @@ func runApp(_ opts: Options) -> Never {
     app.delegate = appDelegate
     Notifier.shared.setUp()
     Notifier.shared.onRecovery = { handle($0) }
+    if let demo = opts.demoStatus { applyDemoStatus(demo) }
     Setup.refreshPrinterInstalled(port: opts.port)
     menuController = MenuBarController(opts: opts)
-    if let demo = opts.demoStatus { applyDemoStatus(demo) }
 
     if let step = opts.demoWizard {
         DispatchQueue.main.async { showDemoWizard(step) }

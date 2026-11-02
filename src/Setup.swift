@@ -30,6 +30,7 @@ enum Setup {
         if demoOverride { return }
         DispatchQueue.global(qos: .utility).async {
             let installed = printerInstalled(port: port)
+            if demoOverride { return }
             cacheLock.lock()
             let changed = cachedInstalled != installed
             cachedInstalled = installed
