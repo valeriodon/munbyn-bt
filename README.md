@@ -6,16 +6,15 @@ Print shipping labels from a Mac to a **MUNBYN ITPP130B** thermal printer over *
 
 [![build](https://github.com/valeriodon/munbyn-bt/actions/workflows/build.yml/badge.svg)](https://github.com/valeriodon/munbyn-bt/actions/workflows/build.yml)
 
-**[Download the DMG](https://github.com/valeriodon/munbyn-bt/releases)** (signed and notarized) · macOS 13 or later · Apple silicon and Intel
+**[Download the DMG](https://github.com/valeriodon/munbyn-bt/releases/latest)** (signed and notarized) · macOS 13 or later · Apple silicon and Intel
 
 <p align="center">
-  <img src="docs/first-run.png" width="280" alt="First-run window: Add Printer">
+  <img src="docs/wizard-connect.png" width="420" alt="Setup assistant: which printer is yours?">
   &nbsp;&nbsp;
-  <img src="docs/menu.png" width="324" alt="Menu bar panel">
+  <img src="docs/menu.png" width="300" alt="Menu bar panel">
 </p>
 
-> **Status: beta.** The Bluetooth link replicates MUNBYN Editor's protocol byte for byte. Everything around it is tested automatically on macOS, but real-hardware testing is still in progress.
-> Unofficial project, not affiliated with or endorsed by MUNBYN.
+> Tested on a real ITPP130B. Unofficial project, not affiliated with or endorsed by MUNBYN.
 
 ---
 
@@ -67,42 +66,52 @@ Marketplaces and carriers usually hand you a PDF on an **A4 or Letter page**, of
 3. fits it to the label without distortion.
 
 Because the PDF is still vector at that stage, the result is sharp, not an upscaled screenshot.
-**Trade-off:** a design with intentional white margins would get enlarged. That's why *Crop white margins* is a visible toggle in the panel and not hidden behaviour.
+**Trade-off:** cropping applies to every page, so a design with intentional white margins gets enlarged. That's why *Crop and Fit to Label* is a visible toggle in the panel and not hidden behaviour. It only removes the outer margins: if an A4 page also carries printed instructions, they stay, and the label comes out smaller.
 
 ### 4. One printer, and the paper size carries the intent
 I first sketched two printers: one that prints the page as is, one that crops and fits. Two nearly identical entries in every print dialog is a choice users shouldn't have to make. Instead there is **one printer**, and the paper size you pick says what you mean:
-- **a label size** (100x150 mm, 4x6 in, …) prints the page as it is;
-- **A4 or Letter** crops and fits it onto your label.
+- **a label size** (100 × 150 mm, 4 × 6 in, …) prints on a label of that size;
+- **A4 or Letter** crops the page and fits it onto the labels loaded in the printer.
 
 Copies and scaling still work, because they come from the standard print dialog.
 
 ### 5. Settings live where the printer lives
-I chose a **menu bar panel** over a preferences window:
-- the status ("Printing 1 of 2 · 60%"), the last print and the connected printer are one click away;
-- the settings that matter on a thermal printer (label size, density, speed, cropping, dithering for photos) are a single submenu each;
-- changes apply to the next print without restarting anything;
-- the icon changes while printing or when something goes wrong.
+I chose a **menu bar panel** over a preferences window. It opens on a status header that is always readable and updates while the menu is open ("Printing label 1 of 2 · 60%", "Ready to print · last label 3:55 PM"). Right under it there is at most **one fix-it item** for the current state: *Finish Setup…*, *Try Again*, *Open Bluetooth Settings…* or *Cancel Printing*.
 
-**Feedback rule:** success is silent, because the label coming out *is* the feedback. Errors raise a notification with a plain-language cause, for example "Printer not found: is it on and close to the Mac?".
+The settings use plain words. *Labels* means the labels loaded in the printer. *Print Quality* holds Darkness (Lighter, Normal, Darker, Darkest) and Speed instead of raw 1-15 and 1-6 scales, which stay available from the command line.
 
-### 6. No Terminal, no manual
-The first version had an install script, which is fine for me and wrong for the people this is for. The released app installs itself on first launch:
-1. a single welcome window explains what will happen;
-2. one admin password prompt adds the printer;
-3. "Open at login" is preselected but can be unticked, and also toggled later from the panel.
+**Feedback rule:** success is silent, because the label coming out *is* the feedback. Failures raise a native notification that says what happened and what to do, with **Try Again** (the failed label is kept, so you don't have to download it again) and **Troubleshoot…**. Every error has a title, one sentence with the next step and one recovery action, for example "Printer not found · Turn it on and keep it near your Mac."
 
-The Bluetooth permission prompt carries a plain explanation. The app also remembers the printer it last used, and *Search for Nearby Printers* covers the rare case of more than one.
+### 6. A setup assistant instead of a manual
+The first version had an install script, fine for me and wrong for the people this is for. The released app opens a short **setup assistant** the first time:
+1. **Connect:** it asks for Bluetooth only at this step, after saying why. It searches live, lists only MUNBYN printers with the signal in words ("Very close") and preselects the closest.
+2. **Labels:** which labels are loaded. The default follows the region (4 × 6 in in the US, 100 × 150 mm elsewhere) and also becomes the print dialog's default.
+3. **Add to Mac:** one admin password prompt, explained before it appears.
+4. **Test label:** a preview of how it should look and three answers: *Looks Good*, *Too Light* or *Too Dark* (which adjust the darkness), and *Nothing Came Out* (a checklist).
+
+The most common trap is pairing the printer in System Settings › Bluetooth, which blocks every other connection. The assistant says up front that pairing isn't needed. When it happens anyway, the app detects the pairing and says how to undo it, instead of a generic "not found". Closing the assistant is never a dead end: the menu then shows *Finish Setup…*, and opening the app again from Finder brings the assistant back.
 
 ### 7. Verifiable without the hardware
 Bluetooth can't run in CI, so I made everything around it testable. Every push builds the app on a macOS runner and then:
 - renders test labels and decodes the generated TSPL back into images to check them pixel by pixel;
 - sends PDFs through a **real CUPS queue**, including multiple copies;
-- takes screenshots of the panel and of the first-run window.
+- takes screenshots of every step of the setup assistant and of every state of the panel, in light and dark mode.
 
 The test label itself is designed to make problems visible on paper:
 - an arrow says which way is up;
-- a checkerboard and a gray scale show density and dithering;
-- text from 14 down to 6 pt shows legibility.
+- a checkerboard and a ladder of dot patterns show the print density, without relying on dithering;
+- text from 14 down to 6 pt shows legibility;
+- the settings used and a reminder of how to print are printed at the bottom, so it can stay on the printer as a cheat sheet.
+
+### 8. Audited before calling it done
+Once the hardware worked, I ran four independent reviews of the interface: Nielsen heuristics (it scored 20 out of 40), accessibility, UX writing (labels, verbs, errors, loading and empty states) and a design critique. I then acted on the points where they agreed:
+- the setup assistant;
+- native notifications instead of a script-based workaround that showed up as Script Editor;
+- a readable, live status instead of dimmed menu rows;
+- plain-language errors and settings;
+- Title Case and one name per thing;
+- VoiceOver labels and announcements for the status and every waiting state;
+- keyboard shortcuts, and focus that returns to the app you were using.
 
 ### How I built it
 I defined the product, made the decisions above and reviewed every iteration. The implementation was done with **Claude Code** as an AI coding agent: reading the vendor's web app, writing the Swift code and running the CI feedback loop. For me that's the interesting part of AI-assisted product work. The fast loop of *decide, build, look at the evidence, adjust* is what turned a frustrating purchase into a finished, installable product in a day.
@@ -110,19 +119,18 @@ I defined the product, made the decisions above and reviewed every iteration. Th
 ## What I'd do next
 - Confirm and tune on more hardware, then open it to other MUNBYN Bluetooth models that use the same protocol (ITPP941B, RW411B).
 - Read the printer's status (paper out, cover open) to warn before printing instead of after.
-- An Italian localization of the panel and the first-run window.
+- An Italian localization of the panel and the setup assistant.
 - Drag and drop a PDF onto the menu bar icon to print it.
 
 ---
 
 ## Install
 
-1. Download `MunbynBT-x.y.z.dmg` from [Releases](https://github.com/valeriodon/munbyn-bt/releases) and drag **MunbynBT** to **Applications**.
-2. Open it, click **Add Printer** and enter your Mac password. Allow Bluetooth when macOS asks.
-3. If you had paired the printer in System Settings › Bluetooth, remove it there: MunbynBT connects on its own.
-4. Turn the printer on and print from any app to **MUNBYN ITPP130B (Bluetooth)**.
+1. Download `MunbynBT-x.y.z.dmg` from [Releases](https://github.com/valeriodon/munbyn-bt/releases/latest) and drag **MunbynBT** to **Applications**.
+2. Open it and follow the setup assistant: it connects the printer, adds it to your Mac and prints a test label.
+3. Print from any app to **MUNBYN ITPP130B (Bluetooth)**.
 
-If a release is marked as not notarized, macOS blocks the first launch. In that case go to System Settings › Privacy & Security and click **Open Anyway**.
+You don't need to pair the printer in System Settings › Bluetooth. If you already did, remove it there.
 
 ### Build from source
 You need the Xcode command line tools (`xcode-select --install`).
@@ -135,14 +143,16 @@ cd munbyn-bt
 
 ## Use
 
-- **Any app:** File › Print › *MUNBYN ITPP130B (Bluetooth)*. Pick your label size to print as is, or A4 / Letter to crop and fit.
+- **Any app:** File › Print › *MUNBYN ITPP130B (Bluetooth)*. Pick your label size, or A4 / Letter for a label that came on a full page.
 - **Menu bar panel:**
-  - status, label size, density, speed, cropping, dithering;
-  - print a PDF or image, print a test label or the printer's self-test page;
-  - check the connection, pick a printer, open the log.
-- **Command line:** `munbyn-bt print label.pdf`, `munbyn-bt test`, `munbyn-bt scan`. Run `munbyn-bt help` for the options.
+  - the status, with the one action that fixes a problem;
+  - Print PDF or Image… (⌘P) and Print Test Label;
+  - Labels, Crop and Fit to Label, Print Quality (darkness, speed, photos);
+  - Printer: search, check the connection, print the printer's self-test, forget;
+  - Help: Setup Assistant, Printers & Scanners, the log.
+- **Command line:** `munbyn-bt print label.pdf`, `munbyn-bt test`, `munbyn-bt scan`. Run `munbyn-bt help` for the options, including the raw darkness (1-15) and speed (1-6).
 
-The log is in `~/Library/Logs/munbyn-bt.log`.
+The log is in `~/Library/Logs/munbyn-bt.log` (Help › Show Log).
 
 ## How it works
 
@@ -164,7 +174,9 @@ The CUPS queue uses a pass-through PPD and the `socket://127.0.0.1:9100` backend
 | `src/BLE.swift` | Bluetooth LE connection and paced writes |
 | `src/Server.swift` | Local socket that receives jobs from CUPS |
 | `src/MenuBar.swift` | Menu bar panel |
-| `src/Setup.swift` | First-run window, printer queue, login item |
+| `src/Wizard.swift` | Setup assistant |
+| `src/Setup.swift` | Printer queue, login item, print dialog default |
+| `src/UserError.swift`, `src/Notifier.swift` | Plain-language errors, notifications, VoiceOver announcements |
 | `src/PPD.swift` | Label sizes and the CUPS PPD |
 | `src/TestPDF.swift` | Test label |
 | `.github/workflows` | CI tests and the signed DMG release |

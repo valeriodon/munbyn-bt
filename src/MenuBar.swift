@@ -17,9 +17,11 @@ func runApp(_ opts: Options) -> Never {
     if opts.headless { dispatchMain() }
 
     isAppMode = true
+    redirectLogToFile()
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     app.delegate = appDelegate
+    if opts.demoDark { app.appearance = NSAppearance(named: .darkAqua) }
     Notifier.shared.setUp()
     Notifier.shared.onRecovery = { handle($0) }
     if let demo = opts.demoStatus { applyDemoStatus(demo) }
@@ -33,6 +35,20 @@ func runApp(_ opts: Options) -> Never {
     }
     app.run()
     exit(0)
+}
+
+/// Started from Finder or as a login item, the app has no terminal: keep the log in
+/// ~/Library/Logs (Help › Show Log), trimmed when it grows past 1 MB.
+private func redirectLogToFile() {
+    guard isatty(STDERR_FILENO) == 0 else { return }
+    let logs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs")
+    try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+    let path = logs.appendingPathComponent("munbyn-bt.log").path
+    if let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int, size > 1_000_000 {
+        try? FileManager.default.removeItem(atPath: path)
+    }
+    freopen(path, "a", stderr)
+    say("MunbynBT \(appVersion) started")
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {

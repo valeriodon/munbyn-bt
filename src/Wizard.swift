@@ -226,7 +226,7 @@ final class WizardModel: ObservableObject {
 /// The text printed at the bottom of the test label.
 func testLabelFooter(_ o: Options) -> [String] {
     ["Darkness \(o.density) · Speed \(o.speed) · Crop and Fit \(o.trim ? "on" : "off")",
-     "It works. Press ⌘P in any app and choose \(Setup.queueTitle)."]
+     "Print from any app: ⌘P › \(Setup.queueTitle)"]
 }
 
 // MARK: - Window

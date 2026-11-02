@@ -35,6 +35,7 @@ struct Options {
     var showMenu = false
     var demoWizard: String? = nil
     var demoStatus: String? = nil
+    var demoDark = false
     var a4 = false
 
     static func fromSettings() -> Options {

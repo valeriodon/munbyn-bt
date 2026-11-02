@@ -72,12 +72,9 @@ jobs:
           for state in ready printing error notsetup; do
             port=$((port + 1)); shot "menu-$state" --port $port --demo-status $state --show-menu
           done
-          defaults write -g AppleInterfaceStyle Dark
-          killall SystemUIServer 2>/dev/null || true
-          sleep 3
-          port=$((port + 1)); shot "dark-wizard-connect-found" --port $port --demo-wizard connect-found
-          port=$((port + 1)); shot "dark-menu-error" --port $port --demo-status error --show-menu
-          defaults delete -g AppleInterfaceStyle || true
+          port=$((port + 1)); shot "dark-wizard-connect-found" --port $port --demo-wizard connect-found --demo-dark
+          port=$((port + 1)); shot "dark-wizard-test" --port $port --demo-wizard test --demo-dark
+          port=$((port + 1)); shot "dark-menu-error" --port $port --demo-status error --show-menu --demo-dark
           ls -la out/ui
 
       - name: CUPS log

@@ -75,6 +75,7 @@ while argIndex < argv.count {
     case "--show-menu": opts.showMenu = true
     case "--demo-wizard": opts.demoWizard = value(a)
     case "--demo-status": opts.demoStatus = value(a)
+    case "--demo-dark": opts.demoDark = true
     case "--a4": opts.a4 = true
     case "-h", "--help": print(helpText); exit(0)
     default:
