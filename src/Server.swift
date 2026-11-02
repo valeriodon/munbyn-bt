@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Darwin
 
 /// Receives jobs from the CUPS queue (socket://127.0.0.1:9100 backend): reads
@@ -31,7 +31,18 @@ final class JobServer {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
         }
         guard bound == 0, listen(fd, 8) == 0 else {
-            fail("Port \(port) is already in use: is MunbynBT already running?")
+            let message = "Port \(port) is already in use. Quit the other copy of MunbynBT (or the app using that port), then open MunbynBT again."
+            guard isAppMode else { fail(message) }
+            say(message)
+            DispatchQueue.main.async {
+                NSApp.activate(ignoringOtherApps: true)
+                let alert = NSAlert()
+                alert.messageText = "MunbynBT can’t start"
+                alert.informativeText = message
+                alert.runModal()
+                exit(1)
+            }
+            return
         }
         say("Listening on 127.0.0.1:\(port)")
 
@@ -66,7 +77,7 @@ final class JobServer {
         opts.names = baseOptions.names
         opts.dryRunDir = baseOptions.dryRunDir
         guard let dir = opts.dryRunDir else {
-            runJobReporting(data: data, opts: opts, title: "job \(number)")
+            runJobReporting(data: data, opts: opts, title: documentTitle(data))
             return
         }
         do {

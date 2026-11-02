@@ -5,7 +5,7 @@ import CoreText
 /// Test label: border, text in several sizes, barcode-like bars, a checkerboard
 /// and a gray scale. With `onA4` it is placed sideways on an A4 sheet, the way
 /// many carriers do it, to exercise cropping and rotation.
-func makeTestPDF(label: LabelSize, onA4: Bool) -> Data {
+func makeTestPDF(label: LabelSize, onA4: Bool, settings: [String] = []) -> Data {
     let lw = CGFloat(label.w) * pointsPerMM, lh = CGFloat(label.h) * pointsPerMM
     var media = onA4 ? CGRect(x: 0, y: 0, width: 595.28, height: 841.89) : CGRect(x: 0, y: 0, width: lw, height: lh)
     let out = NSMutableData()
@@ -17,7 +17,7 @@ func makeTestPDF(label: LabelSize, onA4: Bool) -> Data {
         ctx.translateBy(x: 36 + lh, y: media.height - 36 - lw)
         ctx.rotate(by: .pi / 2)
     }
-    drawTestLabel(ctx, width: lw, height: lh)
+    drawTestLabel(ctx, width: lw, height: lh, footer: settings)
     ctx.restoreGState()
     ctx.endPDFPage()
     ctx.closePDF()
@@ -35,7 +35,7 @@ private func drawText(_ text: String, size: CGFloat, bold: Bool = false, x: CGFl
     CTLineDraw(line, ctx)
 }
 
-private func drawTestLabel(_ ctx: CGContext, width w: CGFloat, height h: CGFloat) {
+private func drawTestLabel(_ ctx: CGContext, width w: CGFloat, height h: CGFloat, footer: [String]) {
     let m: CGFloat = 10
     ctx.setFillColor(gray: 0, alpha: 1)
     ctx.setStrokeColor(gray: 0, alpha: 1)
@@ -79,19 +79,41 @@ private func drawTestLabel(_ ctx: CGContext, width w: CGFloat, height h: CGFloat
             ctx.fill(CGRect(x: m + 10 + CGFloat(col) * cell, y: gridTop - CGFloat(row + 1) * cell, width: cell, height: cell))
         }
     }
+    // Density ladder drawn as dots, so it shows on paper even without dithering:
+    // each step covers more of its cell, from white to solid black.
     let steps = 8
     let stepWidth = (w - 2 * m - 70) / CGFloat(steps)
+    let dot: CGFloat = 1.8
     for i in 0..<steps {
-        ctx.setFillColor(gray: CGFloat(i) / CGFloat(steps - 1), alpha: 1)
-        ctx.fill(CGRect(x: m + 54 + CGFloat(i) * stepWidth, y: gridTop - 8 * cell, width: stepWidth, height: 8 * cell))
+        let x0 = m + 54 + CGFloat(i) * stepWidth, y0 = gridTop - 8 * cell
+        let coverage = CGFloat(i) / CGFloat(steps - 1)
+        if coverage >= 1 {
+            ctx.fill(CGRect(x: x0, y: y0, width: stepWidth, height: 8 * cell))
+            continue
+        }
+        let side = dot * sqrt(coverage)
+        var y = y0
+        while y < y0 + 8 * cell - 0.01 {
+            var x = x0
+            while x < x0 + stepWidth - 0.01 {
+                if side > 0 { ctx.fill(CGRect(x: x + (dot - side) / 2, y: y + (dot - side) / 2, width: side, height: side)) }
+                x += dot
+            }
+            y += dot
+        }
     }
-    ctx.setFillColor(gray: 0, alpha: 1)
     ctx.stroke(CGRect(x: m + 54, y: gridTop - 8 * cell, width: stepWidth * CGFloat(steps), height: 8 * cell))
 
     var ty = gridTop - 8 * cell - 18
     for size in [14, 10, 8, 6] as [CGFloat] where ty > m + 12 {
         drawText("Text \(Int(size)) pt: ÀÉÎÕÜ àéîõü 0123456789", size: size, x: m + 10, y: ty, in: ctx)
         ty -= size + 6
+    }
+    // The settings used, and how to print from now on: the label doubles as a reminder.
+    var fy = m + 22 + CGFloat(max(footer.count - 1, 0)) * 12
+    for (i, line) in footer.enumerated() where fy > m + 16 && fy < ty {
+        drawText(line, size: i == footer.count - 1 ? 8 : 7, bold: i == footer.count - 1, x: m + 10, y: fy, in: ctx)
+        fy -= 12
     }
     drawText("BOTTOM", size: 8, bold: true, x: w / 2 - 18, y: m + 6, in: ctx)
 }

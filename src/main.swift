@@ -73,6 +73,8 @@ while argIndex < argv.count {
     case "--port": opts.port = UInt16(value(a)) ?? opts.port
     case "--headless": opts.headless = true
     case "--show-menu": opts.showMenu = true
+    case "--demo-wizard": opts.demoWizard = value(a)
+    case "--demo-status": opts.demoStatus = value(a)
     case "--a4": opts.a4 = true
     case "-h", "--help": print(helpText); exit(0)
     default:
@@ -98,7 +100,7 @@ case "print":
 
 case "test":
     do {
-        let data = makeTestPDF(label: opts.label ?? opts.fallbackLabel, onA4: false)
+        let data = makeTestPDF(label: opts.label ?? opts.fallbackLabel, onA4: false, settings: testLabelFooter(opts))
         _ = try runJob(data: data, opts: opts, title: "test label")
     } catch {
         fail("\(error)")

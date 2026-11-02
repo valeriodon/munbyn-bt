@@ -57,9 +57,9 @@ struct ImageSource: PageSource {
 func loadPages(_ data: Data) throws -> [PageSource] {
     if data.prefix(1024).range(of: Data("%PDF".utf8)) != nil {
         guard let provider = CGDataProvider(data: data as CFData), let doc = CGPDFDocument(provider) else {
-            throw Failure("Unreadable PDF")
+            throw UserError.unreadable
         }
-        guard doc.numberOfPages > 0 else { throw Failure("The PDF has no pages") }
+        guard doc.numberOfPages > 0 else { throw UserError.emptyPDF }
         return (1...doc.numberOfPages).compactMap { doc.page(at: $0) }.map(PDFPageSource.init)
     }
     if let src = CGImageSourceCreateWithData(data as CFData, nil), CGImageSourceGetCount(src) > 0,
@@ -67,9 +67,9 @@ func loadPages(_ data: Data) throws -> [PageSource] {
         return [ImageSource(image: image)]
     }
     if data.starts(with: Data("%!".utf8)) {
-        throw Failure("Received PostScript instead of PDF: remove the printer and add it again with install.sh")
+        throw UserError.needsSetup
     }
-    throw Failure("Unsupported format (PDF, PNG or JPEG expected)")
+    throw UserError.unreadable
 }
 
 func renderDocument(_ data: Data, opts: Options) throws -> [MonoBitmap] {

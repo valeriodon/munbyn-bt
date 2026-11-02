@@ -53,25 +53,32 @@ jobs:
           for f in out/jobs/*.bin; do echo "$f"; head -c 16 "$f" | xxd; done
           test "$(ls out/jobs/*.tspl | wc -l | tr -d ' ')" -ge 3
 
-      - name: Test the menu bar panel
+      - name: Screenshots of the setup assistant and the menu
         run: |
           B=$PWD/build/MunbynBT.app/Contents/MacOS/munbyn-bt
-          mkdir -p out/menu
-          $B --port 9200 --dry-run-dir "$PWD/out/menu" --show-menu > out/menu.log 2>&1 &
-          sleep 6
-          screencapture -x out/menu.png || true
-          pgrep -f "munbyn-bt --port 9200" >/dev/null && echo "the panel is running"
-          cat out/menu.log
-          pkill -f "munbyn-bt --port 9200" || true
-
-      - name: Test the first-run window
-        run: |
-          B=$PWD/build/MunbynBT.app/Contents/MacOS/munbyn-bt
-          $B --port 9300 > out/first-run.log 2>&1 &
-          sleep 6
-          screencapture -x out/first-run.png || true
-          cat out/first-run.log
-          pkill -f "munbyn-bt --port 9300" || true
+          mkdir -p out/ui out/ui-tmp
+          shot() {  # name, then the app's arguments
+            local name=$1; shift
+            "$B" --dry-run-dir "$PWD/out/ui-tmp" "$@" > "out/ui/$name.log" 2>&1 &
+            local pid=$!
+            sleep 6
+            screencapture -x "out/ui/$name.png" || true
+            kill $pid 2>/dev/null; wait $pid 2>/dev/null || true
+          }
+          port=9300
+          for step in welcome connect connect-found connect-failed labels add test done; do
+            port=$((port + 1)); shot "wizard-$step" --port $port --demo-wizard $step
+          done
+          for state in ready printing error notsetup; do
+            port=$((port + 1)); shot "menu-$state" --port $port --demo-status $state --show-menu
+          done
+          defaults write -g AppleInterfaceStyle Dark
+          killall SystemUIServer 2>/dev/null || true
+          sleep 3
+          port=$((port + 1)); shot "dark-wizard-connect-found" --port $port --demo-wizard connect-found
+          port=$((port + 1)); shot "dark-menu-error" --port $port --demo-status error --show-menu
+          defaults delete -g AppleInterfaceStyle || true
+          ls -la out/ui
 
       - name: CUPS log
         if: failure()

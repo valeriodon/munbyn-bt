@@ -33,6 +33,8 @@ struct Options {
     var port: UInt16 = 9100
     var headless = false
     var showMenu = false
+    var demoWizard: String? = nil
+    var demoStatus: String? = nil
     var a4 = false
 
     static func fromSettings() -> Options {
@@ -46,12 +48,17 @@ struct Options {
     }
 }
 
+/// 4 x 6 in where people measure in inches, 100 x 150 mm elsewhere.
+var defaultLabel: LabelSize {
+    Locale.current.measurementSystem == .us ? LabelSize(w: 101.6, h: 152.4) : LabelSize(w: 100, h: 150)
+}
+
 /// Preferences shared by the menu bar app and the command line.
 enum Settings {
     static let store = UserDefaults(suiteName: "com.valeriodon.munbyn-bt.settings") ?? .standard
 
     static var label: LabelSize {
-        get { parseSize(store.string(forKey: "label") ?? "") ?? LabelSize(w: 100, h: 150) }
+        get { parseSize(store.string(forKey: "label") ?? "") ?? defaultLabel }
         set { store.set(sizeName(newValue), forKey: "label") }
     }
     static var density: Int {
@@ -73,6 +80,15 @@ enum Settings {
     static var printerID: UUID? {
         get { store.string(forKey: "printerID").flatMap { UUID(uuidString: $0) } }
         set { store.set(newValue?.uuidString, forKey: "printerID") }
+    }
+    /// The setup assistant was finished (or closed with Set Up Later).
+    static var setupFinished: Bool {
+        get { store.bool(forKey: "setupFinished") }
+        set { store.set(newValue, forKey: "setupFinished") }
+    }
+    static var setupDismissed: Bool {
+        get { store.bool(forKey: "setupDismissed") }
+        set { store.set(newValue, forKey: "setupDismissed") }
     }
     static var printerName: String? {
         get { store.string(forKey: "printerName") }
@@ -109,13 +125,4 @@ func parseSize(_ text: String) -> LabelSize? {
     let parts = t.split(separator: "x")
     guard parts.count == 2, let w = Double(parts[0]), let h = Double(parts[1]), w > 0, h > 0 else { return nil }
     return LabelSize(w: w * factor, h: h * factor)
-}
-
-/// System notification (errors only, to stay out of the way).
-func notify(_ title: String, _ body: String) {
-    let escape = { (s: String) in s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
-    let p = Process()
-    p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-    p.arguments = ["-e", "display notification \"\(escape(body))\" with title \"MUNBYN\" subtitle \"\(escape(title))\""]
-    try? p.run()
 }
