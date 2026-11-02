@@ -120,6 +120,9 @@ case "make-test-pdf":
     guard let path = positional.first else { fail("usage: munbyn-bt make-test-pdf FILE [--label 100x150] [--a4]") }
     do { try makeTestPDF(label: opts.label ?? opts.fallbackLabel, onA4: opts.a4).write(to: URL(fileURLWithPath: path)) } catch { fail("\(error)") }
 
+case "login-item":
+    Setup.setOpensAtLogin(positional.first != "off")
+
 case "ppd":
     print(ppd(defaultLabel: opts.label ?? opts.fallbackLabel), terminator: "")
 

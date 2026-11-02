@@ -1,0 +1,94 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    runs-on: macos-15
+    env:
+      SIGNING: ${{ secrets.DEVID_P12 != '' }}
+      NOTARIZING: ${{ secrets.DEVID_P12 != '' && secrets.ASC_KEY_P8 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the version
+        run: |
+          VERSION=$(sed -n 's/^let appVersion = "\(.*\)"/\1/p' src/main.swift)
+          [[ "$GITHUB_REF_NAME" == "v$VERSION" || "$GITHUB_REF_NAME" == "v$VERSION-"* ]] || {
+            echo "Tag $GITHUB_REF_NAME doesn't match appVersion $VERSION"; exit 1; }
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Import the Developer ID certificate
+        if: env.SIGNING == 'true'
+        env:
+          DEVID_P12: ${{ secrets.DEVID_P12 }}
+          DEVID_P12_PASSWORD: ${{ secrets.DEVID_P12_PASSWORD }}
+        run: |
+          echo "$DEVID_P12" | base64 --decode > "$RUNNER_TEMP/devid.p12"
+          KC="$RUNNER_TEMP/build.keychain-db"
+          security create-keychain -p ci "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p ci "$KC"
+          security import "$RUNNER_TEMP/devid.p12" -k "$KC" -P "$DEVID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k ci "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          IDENTITY=$(security find-identity -v -p codesigning "$KC" | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -1)
+          [[ -n "$IDENTITY" ]] || { echo "No Developer ID Application identity in the certificate"; exit 1; }
+          echo "IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: |
+          ./build.sh --universal --sign "${IDENTITY:--}"
+          codesign --verify --deep --strict --verbose=2 build/MunbynBT.app
+
+      - name: Make the DMG
+        run: |
+          mkdir -p dmg
+          cp -R build/MunbynBT.app dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "MunbynBT $VERSION" -srcfolder dmg -ov -format UDZO "build/MunbynBT-$VERSION.dmg"
+          if [[ -n "${IDENTITY:-}" ]]; then
+            codesign --force --timestamp --sign "$IDENTITY" "build/MunbynBT-$VERSION.dmg"
+          fi
+
+      - name: Notarize
+        if: env.NOTARIZING == 'true'
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          echo "$ASC_KEY_P8" | base64 --decode > "$RUNNER_TEMP/asc.p8"
+          xcrun notarytool submit "build/MunbynBT-$VERSION.dmg" --key "$RUNNER_TEMP/asc.p8" \
+            --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --wait --timeout 30m
+          xcrun stapler staple "build/MunbynBT-$VERSION.dmg"
+          spctl --assess --type open --context context:primary-signature --verbose "build/MunbynBT-$VERSION.dmg"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$NOTARIZING" == "true" ]]; then
+            GATEKEEPER="The app is signed with a Developer ID and notarized by Apple."
+          else
+            GATEKEEPER="This build is not notarized yet. The first time, macOS will refuse to open it: go to **System Settings › Privacy & Security**, click **Open Anyway** next to MunbynBT and confirm."
+          fi
+          cat > notes.md <<EOF
+          ## Install
+
+          1. Open \`MunbynBT-$VERSION.dmg\` and drag **MunbynBT** to **Applications**.
+          2. Open MunbynBT from Applications. $GATEKEEPER
+          3. Click **Add Printer** and enter your Mac password, then allow Bluetooth when macOS asks.
+          4. Turn the printer on and print from any app to **MUNBYN ITPP130B (Bluetooth)**.
+
+          Requires macOS 13 or later, Apple silicon or Intel.
+          EOF
+          PRERELEASE=""
+          [[ "$GITHUB_REF_NAME" == *-* ]] && PRERELEASE="--prerelease"
+          gh release create "$GITHUB_REF_NAME" "build/MunbynBT-$VERSION.dmg" \
+            --title "MunbynBT $GITHUB_REF_NAME" --notes-file notes.md $PRERELEASE

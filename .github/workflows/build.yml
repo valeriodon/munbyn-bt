@@ -11,7 +11,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build
-        run: ./install.sh --build-only
+        run: |
+          ./build.sh --universal
+          lipo -info build/MunbynBT.app/Contents/MacOS/munbyn-bt
+          codesign --verify --verbose build/MunbynBT.app
 
       - name: Test rendering
         run: |
@@ -59,6 +62,15 @@ jobs:
           pgrep -f "munbyn-bt --port 9200" >/dev/null && echo "the panel is running"
           cat out/menu.log
           pkill -f "munbyn-bt --port 9200" || true
+
+      - name: Test the first-run window
+        run: |
+          B=$PWD/build/MunbynBT.app/Contents/MacOS/munbyn-bt
+          $B --port 9300 > out/first-run.log 2>&1 &
+          sleep 6
+          screencapture -x out/first-run.png || true
+          cat out/first-run.log
+          pkill -f "munbyn-bt --port 9300" || true
 
       - name: CUPS log
         if: failure()

@@ -12,6 +12,9 @@ func runApp(_ opts: Options) -> Never {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     let controller = MenuBarController(opts: opts)
+    if opts.dryRunDir == nil {
+        DispatchQueue.main.async { Setup.firstRun(port: opts.port) }
+    }
     withExtendedLifetime(controller) { app.run() }
     exit(0)
 }
@@ -115,7 +118,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(submenu("Bluetooth Printer", printers))
         menu.addItem(.separator())
 
+        if !Setup.printerInstalled(port: opts.port) {
+            menu.addItem(action("Add the Printer to Printers & Scanners…", #selector(addPrinter)))
+        }
         menu.addItem(action("Open Printers & Scanners", #selector(openPrinters)))
+        if #available(macOS 13, *) {
+            let login = action("Open at Login", #selector(toggleLogin))
+            login.state = Setup.opensAtLogin ? .on : .off
+            menu.addItem(login)
+        }
         menu.addItem(action("Open Log", #selector(openLog)))
         menu.addItem(info("munbyn-bt \(appVersion)"))
         menu.addItem(action("Quit", #selector(quit)))
@@ -242,6 +253,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let log = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/munbyn-bt.log")
         NSWorkspace.shared.open(log)
     }
+
+    @objc private func addPrinter() {
+        NSApp.activate(ignoringOtherApps: true)
+        Setup.addPrinterReporting(port: opts.port)
+    }
+
+    @objc private func toggleLogin() { Setup.setOpensAtLogin(!Setup.opensAtLogin) }
 
     @objc private func quit() { NSApp.terminate(nil) }
 
