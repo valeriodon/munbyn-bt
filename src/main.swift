@@ -7,7 +7,7 @@ import Foundation
 // The app lives in the menu bar, receives jobs from CUPS on 127.0.0.1:9100
 // (the "MUNBYN ITPP130B" queue uses the socket:// backend) and forwards them over Bluetooth.
 
-let appVersion = "1.0.0"
+let appVersion = "1.0.1"
 
 let helpText = """
 munbyn-bt \(appVersion) · print to the MUNBYN ITPP130B over Bluetooth

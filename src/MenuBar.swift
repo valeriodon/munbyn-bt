@@ -608,6 +608,7 @@ private func showDemoWizard(_ spec: String) {
     case "add": model.connect = .connected(devices[0].name); model.step = .add
     case "test":
         model.connect = .connected(devices[0].name); model.add = .added; model.step = .test; model.test = .ask
+        model.preparePreview()
     case "done": model.connect = .connected(devices[0].name); model.add = .added; model.step = .done
     default: model.step = .welcome
     }

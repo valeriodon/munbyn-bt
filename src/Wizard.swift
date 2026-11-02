@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import CoreBluetooth
+import QuartzCore
 
 // The setup assistant: connect the printer, choose the labels, add it to the Mac,
 // print a test label. It opens by itself on first launch and from the menu later.
@@ -32,6 +33,8 @@ final class WizardModel: ObservableObject {
     @Published var test: TestState = .idle
     @Published var openAtLogin = true
     @Published var notifyFailures = true
+    /// The test label preview, drawn in the background before the test step needs it.
+    @Published var preview: NSImage?
 
     var demo = false
     var onFinish: (() -> Void)?
@@ -44,7 +47,14 @@ final class WizardModel: ObservableObject {
     }
 
     func go(_ step: WizardStep) {
+        let started = CACurrentMediaTime()
         self.step = step
+        // Runs after the new step is laid out: logs how long the change took, to spot slow steps.
+        DispatchQueue.main.async {
+            let ms = Int((CACurrentMediaTime() - started) * 1000)
+            if ms > 150 { say("Setup assistant: \(step) took \(ms) ms to appear") }
+        }
+        if step.rawValue >= WizardStep.labels.rawValue { preparePreview() }
         switch step {
         case .add where !demo && add == .idle:
             Setup.refreshPrinterInstalled { [weak self] installed in
@@ -154,8 +164,10 @@ final class WizardModel: ObservableObject {
     // MARK: Labels
 
     func saveLabel() {
+        let changed = Settings.label != label
         Settings.label = label
         Setup.syncDefaultPageSize()
+        if changed { preparePreview(force: true) }
     }
 
     // MARK: Add
@@ -209,6 +221,16 @@ final class WizardModel: ObservableObject {
     func adjustDarkness(by delta: Int) {
         Settings.density = min(15, max(1, Settings.density + delta))
         test = .adjusted(Settings.density)
+        preparePreview(force: true)  // the footer lists the darkness
+    }
+
+    func preparePreview(force: Bool = false) {
+        guard preview == nil || force else { return }
+        let o = opts
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let image = renderTestPreview(o)
+            DispatchQueue.main.async { self?.preview = image }
+        }
     }
 
     // MARK: Done
@@ -241,13 +263,12 @@ final class WizardWindow: NSObject, NSWindowDelegate {
     func show(at step: WizardStep? = nil) {
         if let step { model.go(step) }
         if window == nil {
-            let host = NSHostingController(rootView: WizardView(model: model))
-            let w = NSWindow(contentViewController: host)
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 470),
+                             styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            w.contentView = FirstClickHostingView(rootView: WizardView(model: model))
             w.title = "MunbynBT Setup"
-            w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             w.delegate = self
-            w.setContentSize(NSSize(width: 560, height: 470))
             w.center()
             window = w
             model.onFinish = { [weak self] in self?.window?.close() }
@@ -256,6 +277,12 @@ final class WizardWindow: NSObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+        // Switching to a regular app takes effect on the next turn of the run loop:
+        // activate again then, so the window is really in front and takes the first click.
+        DispatchQueue.main.async { [weak self] in
+            NSApp.activate(ignoringOtherApps: true)
+            self?.window?.makeKeyAndOrderFront(nil)
+        }
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -265,6 +292,12 @@ final class WizardWindow: NSObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.accessory)
         StatusCenter.shared.update { _ in }
     }
+}
+
+/// Buttons work on the first click even if the window wasn't in front yet
+/// (the assistant opens by itself at launch, often behind another app).
+final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 // MARK: - Views
@@ -740,7 +773,7 @@ struct TestStep: View {
                         Paragraph("Compare it with this preview. The arrow should point up, the bars should be crisp and the smallest text readable.")
                         Hint(symbol: "circle.lefthalf.filled", text: "Pale or patchy? Choose Too Light. Smudged or bleeding? Choose Too Dark.")
                     }
-                    TestPreview()
+                    TestPreview(image: model.preview)
                 }
             case .adjusted(let darkness):
                 Paragraph("Darkness set to \(darkness). Print again to check.")
@@ -758,30 +791,35 @@ struct TestStep: View {
 }
 
 /// What the test label should look like, rendered by the same code that prints it.
+func renderTestPreview(_ o: Options) -> NSImage? {
+    guard let bm = try? renderDocument(makeTestPDF(label: o.fallbackLabel, onA4: false, settings: testLabelFooter(o)), opts: o).first,
+          let provider = CGDataProvider(data: Data(bm.pixels) as CFData),
+          let cg = CGImage(width: bm.width, height: bm.height, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: bm.width,
+                           space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: 0),
+                           provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+    else { return nil }
+    return NSImage(cgImage: cg, size: NSSize(width: bm.width, height: bm.height))
+}
+
 struct TestPreview: View {
-    private static let image: NSImage? = {
-        let o = Options.fromSettings()
-        guard let bm = try? renderDocument(makeTestPDF(label: o.fallbackLabel, onA4: false, settings: testLabelFooter(o)), opts: o).first,
-              let provider = CGDataProvider(data: Data(bm.pixels) as CFData),
-              let cg = CGImage(width: bm.width, height: bm.height, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: bm.width,
-                               space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: 0),
-                               provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
-        else { return nil }
-        return NSImage(cgImage: cg, size: NSSize(width: bm.width, height: bm.height))
-    }()
+    let image: NSImage?
 
     var body: some View {
-        if let image = Self.image {
-            Image(nsImage: image)
-                .resizable()
-                .interpolation(.high)
-                .aspectRatio(contentMode: .fit)
-                .frame(height: 170)
-                .background(Color.white)
-                .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.secondary.opacity(0.4)))
-                .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
-                .accessibilityLabel("Preview of the test label")
+        Group {
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                Color.white
+            }
         }
+        .frame(width: 114, height: 170)
+        .background(Color.white)
+        .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.secondary.opacity(0.4)))
+        .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
+        .accessibilityLabel("Preview of the test label")
     }
 }
 
