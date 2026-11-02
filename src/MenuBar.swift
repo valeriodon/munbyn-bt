@@ -610,6 +610,14 @@ private func showDemoWizard(_ spec: String) {
         model.connect = .connected(devices[0].name); model.add = .added; model.step = .test; model.test = .ask
         model.preparePreview()
     case "done": model.connect = .connected(devices[0].name); model.add = .added; model.step = .done
+    case "walk":
+        // Goes through every step like a person pressing Continue, logging how long each takes.
+        logAllStepTimes = true
+        model.connect = .connected(devices[0].name)
+        model.add = .added
+        for (i, step) in WizardStep.allCases.dropFirst().enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5 + Double(i)) { model.go(step) }
+        }
     default: model.step = .welcome
     }
     WizardWindow.shared.show()

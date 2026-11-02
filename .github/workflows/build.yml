@@ -79,6 +79,8 @@ jobs:
           for step in welcome connect connect-found connect-failed labels add test done; do
             port=$((port + 1)); shot "wizard-$step" --port $port --demo-wizard $step
           done
+          port=$((port + 1)); shot "wizard-walk" --port $port --demo-wizard walk
+          grep "took" out/ui/wizard-walk.log || true
           for state in ready printing error notsetup; do
             port=$((port + 1)); shot "menu-$state" --port $port --demo-status $state --show-menu
           done

@@ -52,7 +52,7 @@ final class WizardModel: ObservableObject {
         // Runs after the new step is laid out: logs how long the change took, to spot slow steps.
         DispatchQueue.main.async {
             let ms = Int((CACurrentMediaTime() - started) * 1000)
-            if ms > 150 { say("Setup assistant: \(step) took \(ms) ms to appear") }
+            if ms > 150 || logAllStepTimes { say("Setup assistant: \(step) took \(ms) ms to appear") }
         }
         if step.rawValue >= WizardStep.labels.rawValue { preparePreview() }
         switch step {
@@ -244,6 +244,9 @@ final class WizardModel: ObservableObject {
         onFinish?()
     }
 }
+
+/// Set by the CI walk-through, which logs every step change.
+var logAllStepTimes = false
 
 /// The text printed at the bottom of the test label.
 func testLabelFooter(_ o: Options) -> [String] {
