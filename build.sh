@@ -22,7 +22,7 @@ fi
 
 APP=build/MunbynBT.app
 VERSION=$(sed -n 's/^let appVersion = "\(.*\)"/\1/p' src/main.swift)
-echo "Building MunbynBT $VERSION…"
+echo "Building MunbynBT ${VERSION}…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp support/Info.plist "$APP/Contents/Info.plist"
