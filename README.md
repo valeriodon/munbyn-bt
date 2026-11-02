@@ -6,7 +6,7 @@ Print shipping labels from a Mac to a **MUNBYN ITPP130B** thermal printer over *
 
 [![build](https://github.com/valeriodon/munbyn-bt/actions/workflows/build.yml/badge.svg)](https://github.com/valeriodon/munbyn-bt/actions/workflows/build.yml)
 
-**[Download the latest release](https://github.com/valeriodon/munbyn-bt/releases/latest)** · macOS 13 or later · Apple silicon and Intel
+**[Download the DMG](https://github.com/valeriodon/munbyn-bt/releases)** (signed and notarized) · macOS 13 or later · Apple silicon and Intel
 
 <p align="center">
   <img src="docs/first-run.png" width="280" alt="First-run window: Add Printer">
@@ -117,7 +117,7 @@ I defined the product, made the decisions above and reviewed every iteration. Th
 
 ## Install
 
-1. Download `MunbynBT-x.y.z.dmg` from [Releases](https://github.com/valeriodon/munbyn-bt/releases/latest) and drag **MunbynBT** to **Applications**.
+1. Download `MunbynBT-x.y.z.dmg` from [Releases](https://github.com/valeriodon/munbyn-bt/releases) and drag **MunbynBT** to **Applications**.
 2. Open it, click **Add Printer** and enter your Mac password. Allow Bluetooth when macOS asks.
 3. If you had paired the printer in System Settings › Bluetooth, remove it there: MunbynBT connects on its own.
 4. Turn the printer on and print from any app to **MUNBYN ITPP130B (Bluetooth)**.
