@@ -89,6 +89,8 @@ The first version had an install script, fine for me and wrong for the people th
 3. **Add to Mac:** one admin password prompt, explained before it appears.
 4. **Test label:** a preview of how it should look and three answers: *Looks Good*, *Too Light* or *Too Dark* (which adjust the darkness), and *Nothing Came Out* (a checklist).
 
+<p align="center"><img src="docs/wizard-test.png" width="480" alt="Setup assistant, test label step: how does it look?"></p>
+
 The most common trap is pairing the printer in System Settings › Bluetooth, which blocks every other connection. The assistant says up front that pairing isn't needed. When it happens anyway, the app detects the pairing and says how to undo it, instead of a generic "not found". Closing the assistant is never a dead end: the menu then shows *Finish Setup…*, and opening the app again from Finder brings the assistant back.
 
 ### 7. Verifiable without the hardware

@@ -267,7 +267,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(labelsItem())
         let crop = self.action("Crop and Fit to Label", #selector(toggleTrim))
         crop.state = Settings.trim ? .on : .off
-        subtitle(crop, "Removes white margins and fits the label")
+        subtitle(crop, "Removes white margins")
         menu.addItem(crop)
         menu.addItem(qualityItem())
         menu.addItem(.separator())
@@ -279,7 +279,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         if #available(macOS 13, *) {
             let login = self.action("Open at Login", #selector(toggleLogin))
             login.state = Setup.opensAtLogin ? .on : .off
-            subtitle(login, "MunbynBT must be running to print")
+            subtitle(login, "Needed to print")
             menu.addItem(login)
         }
         menu.addItem(self.action("About MunbynBT", #selector(about)))
@@ -297,7 +297,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             sub.addItem(it)
         }
         let item = submenu("Labels: \(labelName(current))", sub)
-        subtitle(item, "Also used for A4, Letter and test labels")
+        subtitle(item, "Used for A4 and Letter pages")
         return item
     }
 
@@ -335,7 +335,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         sub.addItem(.separator())
         let photos = action("Optimize for Photos", #selector(toggleDither))
         photos.state = Settings.dither ? .on : .off
-        subtitle(photos, "Keep off for shipping labels and barcodes")
+        subtitle(photos, "Off for labels and barcodes")
         sub.addItem(photos)
         return submenu("Print Quality", sub)
     }
