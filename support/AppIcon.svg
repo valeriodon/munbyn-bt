@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- MunbynBT app icon: a thermal label coming out of a printer, with a Bluetooth badge. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBF8F2"/>
+      <stop offset="1" stop-color="#E6DDCD"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#40464F"/>
+      <stop offset="1" stop-color="#1C2025"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3B9BFF"/>
+      <stop offset="1" stop-color="#0068E0"/>
+    </linearGradient>
+    <filter id="tile" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+    <filter id="lift" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#3A2E1A" flood-opacity="0.22"/>
+    </filter>
+    <clipPath id="shape"><rect x="100" y="100" width="824" height="824" rx="186"/></clipPath>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)" filter="url(#tile)"/>
+  <g clip-path="url(#shape)">
+    <g filter="url(#lift)">
+      <path d="M332 380 H692 V812 L668 826 L644 812 L620 826 L596 812 L572 826 L548 812 L524 826 L500 812 L476 826 L452 812 L428 826 L404 812 L380 826 L356 812 L332 826 Z" fill="#FFFFFF"/>
+    </g>
+    <rect x="372" y="452" width="200" height="22" rx="11" fill="#1E2227"/>
+    <rect x="372" y="498" width="280" height="14" rx="7" fill="#9AA0A8"/>
+    <rect x="372" y="530" width="230" height="14" rx="7" fill="#9AA0A8"/>
+    <rect x="372" y="562" width="260" height="14" rx="7" fill="#9AA0A8"/>
+    <g>
+      <rect x="372" y="612" width="12" height="150" fill="#1E2227"/>
+      <rect x="394" y="612" width="12" height="150" fill="#1E2227"/>
+      <rect x="413" y="612" width="6" height="150" fill="#1E2227"/>
+      <rect x="424" y="612" width="12" height="150" fill="#1E2227"/>
+      <rect x="446" y="612" width="6" height="150" fill="#1E2227"/>
+      <rect x="457" y="612" width="12" height="150" fill="#1E2227"/>
+      <rect x="476" y="612" width="6" height="150" fill="#1E2227"/>
+      <rect x="487" y="612" width="4" height="150" fill="#1E2227"/>
+      <rect x="501" y="612" width="12" height="150" fill="#1E2227"/>
+      <rect x="520" y="612" width="6" height="150" fill="#1E2227"/>
+      <rect x="536" y="612" width="4" height="150" fill="#1E2227"/>
+      <rect x="550" y="612" width="4" height="150" fill="#1E2227"/>
+      <rect x="559" y="612" width="4" height="150" fill="#1E2227"/>
+      <rect x="568" y="612" width="6" height="150" fill="#1E2227"/>
+      <rect x="584" y="612" width="4" height="150" fill="#1E2227"/>
+      <rect x="595" y="612" width="8" height="150" fill="#1E2227"/>
+      <rect x="610" y="612" width="6" height="150" fill="#1E2227"/>
+      <rect x="626" y="612" width="6" height="150" fill="#1E2227"/>
+      <rect x="642" y="612" width="8" height="150" fill="#1E2227"/>
+    </g>
+    <rect x="236" y="214" width="552" height="196" rx="60" fill="url(#body)"/>
+    <rect x="236" y="214" width="552" height="96" rx="48" fill="#FFFFFF" opacity="0.06"/>
+    <rect x="306" y="362" width="412" height="18" rx="9" fill="#0B0D10"/>
+    <circle cx="300" cy="286" r="13" fill="#34C759"/>
+  </g>
+  <circle cx="742" cy="246" r="86" fill="url(#badge)" stroke="#FBF8F2" stroke-width="12"/>
+  <path d="M712 222 L772 270 L742 294 L742 198 L772 222 L712 270" fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

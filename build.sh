@@ -37,6 +37,16 @@ else
   swiftc -O -swift-version 5 -target "$(uname -m)-apple-macos13" -o "$APP/Contents/MacOS/munbyn-bt" src/*.swift
 fi
 
+# App icon: support/AppIcon.png (rendered from support/AppIcon.svg) to .icns.
+ICONSET=build/AppIcon.iconset
+rm -rf "$ICONSET"
+mkdir -p "$ICONSET" "$APP/Contents/Resources"
+for s in 16 32 128 256 512; do
+  sips -z $s $s support/AppIcon.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+  sips -z $((s * 2)) $((s * 2)) support/AppIcon.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+
 if [[ "$IDENTITY" == "-" ]]; then
   codesign --force --sign - "$APP"
 else
