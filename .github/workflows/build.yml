@@ -1,0 +1,71 @@
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: ./install.sh --build-only
+
+      - name: Test rendering
+        run: |
+          B=build/MunbynBT.app/Contents/MacOS/munbyn-bt
+          mkdir -p out
+          $B version
+          $B make-test-pdf out/label.pdf
+          $B make-test-pdf out/a4.pdf --a4
+          $B print out/label.pdf --dry-run out/label.tspl --preview out/label.png
+          $B print out/a4.pdf --dry-run out/a4.tspl --preview out/a4.png
+          $B print out/a4.pdf --no-trim --dry-run out/a4-no-trim.tspl --preview out/a4-no-trim.png
+          $B print out/label.pdf --label 4x6in --dither --dry-run out/4x6.tspl --preview out/4x6.png
+          cp build/munbyn.ppd out/
+          head -c 200 out/label.tspl | strings
+
+      - name: Test the CUPS queue (no Bluetooth)
+        run: |
+          B=$PWD/build/MunbynBT.app/Contents/MacOS/munbyn-bt
+          mkdir -p out/jobs
+          $B serve --headless --dry-run-dir "$PWD/out/jobs" > out/serve.log 2>&1 &
+          sleep 3
+          sudo lpadmin -p MUNBYN_TEST -E -v socket://127.0.0.1:9100 -P build/munbyn.ppd
+          lpstat -p MUNBYN_TEST
+          lp -d MUNBYN_TEST -o media=w283h425 out/label.pdf
+          lp -d MUNBYN_TEST -o media=A4 out/a4.pdf
+          lp -d MUNBYN_TEST -n 2 -o media=w283h425 out/label.pdf
+          for i in $(seq 1 60); do
+            n=$(ls out/jobs/*.tspl 2>/dev/null | wc -l | tr -d ' ')
+            [ "$n" -ge 3 ] && break
+            sleep 2
+          done
+          sleep 5
+          ls -la out/jobs
+          cat out/serve.log
+          for f in out/jobs/*.bin; do echo "$f"; head -c 16 "$f" | xxd; done
+          test "$(ls out/jobs/*.tspl | wc -l | tr -d ' ')" -ge 3
+
+      - name: Test the menu bar panel
+        run: |
+          B=$PWD/build/MunbynBT.app/Contents/MacOS/munbyn-bt
+          mkdir -p out/menu
+          $B --port 9200 --dry-run-dir "$PWD/out/menu" --show-menu > out/menu.log 2>&1 &
+          sleep 6
+          screencapture -x out/menu.png || true
+          pgrep -f "munbyn-bt --port 9200" >/dev/null && echo "the panel is running"
+          cat out/menu.log
+          pkill -f "munbyn-bt --port 9200" || true
+
+      - name: CUPS log
+        if: failure()
+        run: sudo tail -n 80 /var/log/cups/error_log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-output
+          path: out

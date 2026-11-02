@@ -1,0 +1,258 @@
+import Foundation
+import CoreBluetooth
+
+struct NearbyDevice {
+    let id: UUID
+    let name: String
+    let rssi: Int
+    let match: Bool
+}
+
+/// Bluetooth LE link to the printer. The public methods are synchronous and must
+/// be called off the CoreBluetooth queue (for example from jobQueue).
+final class BLEPrinter: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
+    // ISSC "transparent UART" service that MUNBYN Editor uses for the ITPP130B.
+    static let serviceUUID = CBUUID(string: "49535343-FE7D-4AE5-8FA9-9FAFD205E455")
+    static let writeUUID = CBUUID(string: "49535343-8841-43F4-A8D4-ECBE34729BB3")
+    static let notifyUUID = CBUUID(string: "49535343-1E4D-4BD9-BA61-23C647249616")
+    static let standardServices: Set<CBUUID> = [CBUUID(string: "1800"), CBUUID(string: "1801"),
+                                                CBUUID(string: "180A"), CBUUID(string: "180F")]
+
+    private let queue = DispatchQueue(label: "munbyn-bt.ble")
+    private var central: CBCentralManager!
+    private let names: [String]
+
+    // State read and written only on `queue`.
+    private var discovered: CBPeripheral?
+    private var discoveredName: String?
+    private var seen: [UUID: (name: String, rssi: Int)] = [:]
+    private var isConnected = false
+    private var connectError: Error?
+    private var servicesLeft = -1
+    private var characteristics: [CBCharacteristic] = []
+    private var acks = 0
+    private var writeError: Error?
+
+    private var peripheral: CBPeripheral?
+    private var writer: CBCharacteristic?
+
+    init(names: [String]) {
+        self.names = names.map { $0.uppercased() }
+        super.init()
+        central = CBCentralManager(delegate: self, queue: queue)
+    }
+
+    private func onQueue<T>(_ body: () -> T) -> T { queue.sync(execute: body) }
+
+    private func wait(_ seconds: TimeInterval, _ message: String, until done: () -> Bool) throws {
+        let deadline = Date().addingTimeInterval(seconds)
+        while !onQueue(done) {
+            if Date() > deadline { throw Failure(message) }
+            usleep(5_000)
+        }
+    }
+
+    func matches(_ name: String?) -> Bool {
+        guard let n = name?.uppercased(), !n.isEmpty else { return false }
+        return names.contains { n.hasPrefix($0) || n.contains($0) }
+    }
+
+    func ensurePoweredOn() throws {
+        try wait(10, "The Mac's Bluetooth is not responding") { central.state != .unknown && central.state != .resetting }
+        switch onQueue({ central.state }) {
+        case .poweredOn: return
+        case .unauthorized: throw Failure("MunbynBT has no Bluetooth permission: System Settings › Privacy & Security › Bluetooth")
+        case .poweredOff: throw Failure("The Mac's Bluetooth is turned off")
+        case .unsupported: throw Failure("This Mac doesn't support Bluetooth LE")
+        default: throw Failure("Bluetooth is not ready")
+        }
+    }
+
+    func scanAll(seconds: TimeInterval) throws -> [NearbyDevice] {
+        try ensurePoweredOn()
+        onQueue {
+            seen = [:]
+            central.scanForPeripherals(withServices: nil, options: nil)
+        }
+        usleep(useconds_t(seconds * 1_000_000))
+        return onQueue {
+            central.stopScan()
+            return seen.map { NearbyDevice(id: $0.key, name: $0.value.name, rssi: $0.value.rssi, match: matches($0.value.name)) }
+                .sorted { ($0.match ? 1 : 0, $0.rssi) > ($1.match ? 1 : 0, $1.rssi) }
+        }
+    }
+
+    /// Connects to the printer: first the one used last time, then searches by name.
+    @discardableResult
+    func connect(savedID: UUID?, scanSeconds: TimeInterval = 20) throws -> (id: UUID, name: String) {
+        try ensurePoweredOn()
+        var candidates: [CBPeripheral] = []
+        if let id = savedID { candidates += onQueue { central.retrievePeripherals(withIdentifiers: [id]) } }
+        candidates += onQueue { central.retrieveConnectedPeripherals(withServices: [Self.serviceUUID]).filter { matches($0.name) } }
+        for p in candidates where (try? open(p)) != nil {
+            return (p.identifier, p.name ?? "printer")
+        }
+
+        onQueue {
+            discovered = nil
+            discoveredName = nil
+            central.scanForPeripherals(withServices: nil, options: nil)
+        }
+        do {
+            try wait(scanSeconds, "Printer not found: is it on and close to the Mac?") { discovered != nil }
+        } catch {
+            onQueue { central.stopScan() }
+            throw error
+        }
+        let found = onQueue { () -> (CBPeripheral, String?) in
+            central.stopScan()
+            return (discovered!, discoveredName)
+        }
+        try open(found.0)
+        return (found.0.identifier, found.1 ?? found.0.name ?? "printer")
+    }
+
+    private func open(_ p: CBPeripheral) throws {
+        var lastError: Error = Failure("Connection failed")
+        for attempt in 1...3 {
+            onQueue {
+                isConnected = false
+                connectError = nil
+                p.delegate = self
+                central.connect(p, options: nil)
+            }
+            do {
+                try wait(6, "The printer is not responding") { isConnected || connectError != nil }
+                if let e = onQueue({ connectError }) { throw e }
+                try discover(p)
+                peripheral = p
+                return
+            } catch {
+                lastError = error
+                onQueue { central.cancelPeripheralConnection(p) }
+                if attempt < 3 { usleep(400_000) }
+            }
+        }
+        throw lastError
+    }
+
+    private func discover(_ p: CBPeripheral) throws {
+        onQueue {
+            characteristics = []
+            servicesLeft = -1
+            p.discoverServices(nil)
+        }
+        try wait(8, "The printer doesn't expose the expected Bluetooth services") { servicesLeft == 0 }
+        let chars = onQueue { characteristics }
+        let canWrite: (CBCharacteristic) -> Bool = {
+            $0.properties.contains(.writeWithoutResponse) || $0.properties.contains(.write)
+        }
+        guard let w = chars.first(where: { $0.uuid == Self.writeUUID })
+            ?? chars.first(where: { $0.service?.uuid == Self.serviceUUID && canWrite($0) })
+            ?? chars.first(where: { canWrite($0) && !Self.standardServices.contains($0.service?.uuid ?? CBUUID(string: "1800")) })
+        else { throw Failure("The printer has no Bluetooth write channel") }
+        writer = w
+        if let n = chars.first(where: { $0.uuid == Self.notifyUUID })
+            ?? chars.first(where: { $0.service == w.service && $0.properties.contains(.notify) }) {
+            onQueue { p.setNotifyValue(true, for: n) }
+        }
+        say("Bluetooth channel: \(w.uuid.uuidString), \(onQueue { p.maximumWriteValueLength(for: .withoutResponse) }) bytes per write")
+    }
+
+    /// Sends the data in chunks, following CoreBluetooth's flow control and
+    /// MUNBYN Editor's pacing (8 ms every 180 bytes on a Mac).
+    func send(_ data: Data, chunk: Int, pacingMs: Double, progress: ((Double) -> Void)? = nil) throws {
+        guard let p = peripheral, let w = writer else { throw Failure("Printer not connected") }
+        let type: CBCharacteristicWriteType = w.properties.contains(.writeWithoutResponse) ? .withoutResponse : .withResponse
+        let size = max(20, min(chunk, onQueue { p.maximumWriteValueLength(for: type) }))
+        let pause = useconds_t(pacingMs * 1000 * Double(size) / 180)
+        let bytes = [UInt8](data)
+        onQueue {
+            acks = 0
+            writeError = nil
+        }
+        var offset = 0, sent = 0, lastReport = Date()
+        while offset < bytes.count {
+            let end = min(offset + size, bytes.count)
+            let piece = Data(bytes[offset..<end])
+            if type == .withoutResponse {
+                try wait(8, "The printer stopped accepting data") { p.canSendWriteWithoutResponse || !isConnected }
+                guard onQueue({ isConnected }) else { throw Failure("The printer disconnected while receiving data") }
+                onQueue { p.writeValue(piece, for: w, type: .withoutResponse) }
+            } else {
+                sent += 1
+                let target = sent
+                onQueue { p.writeValue(piece, for: w, type: .withResponse) }
+                try wait(8, "The printer is not acknowledging data") { acks >= target || writeError != nil || !isConnected }
+                if let e = onQueue({ writeError }) { throw e }
+                guard onQueue({ isConnected }) else { throw Failure("The printer disconnected while receiving data") }
+            }
+            offset = end
+            if pause > 0 { usleep(pause) }
+            if let progress, Date().timeIntervalSince(lastReport) > 0.5 {
+                progress(Double(offset) / Double(bytes.count))
+                lastReport = Date()
+            }
+        }
+    }
+
+    func disconnect() {
+        guard let p = peripheral else { return }
+        usleep(1_500_000)  // give the printer time to drain its buffer
+        onQueue { central.cancelPeripheralConnection(p) }
+        peripheral = nil
+        writer = nil
+    }
+
+    // MARK: CBCentralManagerDelegate
+
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        if central.state == .unauthorized { say("Bluetooth permission denied") }
+    }
+
+    func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
+                        advertisementData: [String: Any], rssi RSSI: NSNumber) {
+        let name = (advertisementData[CBAdvertisementDataLocalNameKey] as? String) ?? peripheral.name ?? ""
+        if !name.isEmpty { seen[peripheral.identifier] = (name, RSSI.intValue) }
+        if discovered == nil && matches(name) {
+            discovered = peripheral
+            discoveredName = name
+        }
+    }
+
+    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        isConnected = true
+    }
+
+    func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        connectError = error ?? Failure("Connection refused")
+    }
+
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        isConnected = false
+    }
+
+    // MARK: CBPeripheralDelegate
+
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        let services = peripheral.services ?? []
+        servicesLeft = services.count
+        for s in services { peripheral.discoverCharacteristics(nil, for: s) }
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+        characteristics += service.characteristics ?? []
+        servicesLeft -= 1
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let error { writeError = error }
+        acks += 1
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let v = characteristic.value, !v.isEmpty {
+            say("From printer: " + v.map { String(format: "%02X", $0) }.joined(separator: " "))
+        }
+    }
+}
