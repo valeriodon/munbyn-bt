@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   dmg:
-    runs-on: macos-15
+    runs-on: macos-14
     env:
       SIGNING: ${{ secrets.DEVID_P12 != '' }}
       NOTARIZING: ${{ secrets.DEVID_P12 != '' && secrets.ASC_KEY_P8 != '' }}
