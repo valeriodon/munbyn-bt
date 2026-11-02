@@ -68,7 +68,12 @@ jobs:
             local pid=$!
             sleep 6
             screencapture -x "out/ui/$name.png" || true
-            kill $pid 2>/dev/null; wait $pid 2>/dev/null || true
+            if ! kill $pid 2>/dev/null; then
+              echo "::warning::$name: the app exited early"
+              cat "out/ui/$name.log"
+              ls -t ~/Library/Logs/DiagnosticReports/*munbyn* 2>/dev/null | head -1 | xargs -I{} sh -c 'head -c 6000 "{}"' || true
+            fi
+            wait $pid 2>/dev/null || true
           }
           port=9300
           for step in welcome connect connect-found connect-failed labels add test done; do

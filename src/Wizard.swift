@@ -263,12 +263,12 @@ final class WizardWindow: NSObject, NSWindowDelegate {
     func show(at step: WizardStep? = nil) {
         if let step { model.go(step) }
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 470),
-                             styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            w.contentView = FirstClickHostingView(rootView: WizardView(model: model))
+            let w = NSWindow(contentViewController: NSHostingController(rootView: WizardView(model: model)))
             w.title = "MunbynBT Setup"
+            w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             w.delegate = self
+            w.setContentSize(NSSize(width: 560, height: 470))
             w.center()
             window = w
             model.onFinish = { [weak self] in self?.window?.close() }
@@ -292,12 +292,6 @@ final class WizardWindow: NSObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.accessory)
         StatusCenter.shared.update { _ in }
     }
-}
-
-/// Buttons work on the first click even if the window wasn't in front yet
-/// (the assistant opens by itself at launch, often behind another app).
-final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 // MARK: - Views

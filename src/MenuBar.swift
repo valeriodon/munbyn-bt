@@ -17,7 +17,7 @@ func runApp(_ opts: Options) -> Never {
     if opts.headless { dispatchMain() }
 
     isAppMode = true
-    redirectLogToFile()
+    if opts.dryRunDir == nil { redirectLogToFile() }
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     app.delegate = appDelegate
