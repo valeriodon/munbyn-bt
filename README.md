@@ -187,6 +187,10 @@ The CUPS queue uses a pass-through PPD and the `socket://127.0.0.1:9100` backend
 
 Quit MunbynBT from its menu, remove *MUNBYN ITPP130B (Bluetooth)* in Printers & Scanners and delete the app. From a clone of the repo, `./uninstall.sh` does all of it.
 
+## Support
+
+If MunbynBT saves you time, you can support its development on [GitHub Sponsors](https://github.com/sponsors/valeriodon), or from the app with Help › Support MunbynBT….
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
