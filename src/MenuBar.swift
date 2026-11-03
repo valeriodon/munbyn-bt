@@ -368,6 +368,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         sub.addItem(action("Open Printers & Scanners", #selector(openPrinters)))
         sub.addItem(action("Show Log", #selector(openLog)))
         sub.addItem(action("MunbynBT on GitHub", #selector(openWebsite)))
+        sub.addItem(.separator())
+        sub.addItem(action("Support MunbynBT…", #selector(openSponsors)))
         return submenu("Help", sub)
     }
 
@@ -529,6 +531,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func openWebsite() {
         NSWorkspace.shared.open(URL(string: "https://github.com/valeriodon/munbyn-bt")!)
+    }
+
+    @objc private func openSponsors() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/sponsors/valeriodon")!)
     }
 
     @objc private func toggleLogin() { Setup.setOpensAtLogin(!Setup.opensAtLogin) }

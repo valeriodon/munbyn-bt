@@ -151,7 +151,7 @@ cd munbyn-bt
   - Print PDF or Image… (⌘P) and Print Test Label;
   - Labels, Crop and Fit to Label, Print Quality (darkness, speed, photos);
   - Printer: search, check the connection, print the printer's self-test, forget;
-  - Help: Setup Assistant, Printers & Scanners, the log.
+  - Help: Setup Assistant, Printers & Scanners, the log, Support MunbynBT.
 - **Command line:** `munbyn-bt print label.pdf`, `munbyn-bt test`, `munbyn-bt scan`. Run `munbyn-bt help` for the options, including the raw darkness (1-15) and speed (1-6).
 
 The log is in `~/Library/Logs/munbyn-bt.log` (Help › Show Log).
